@@ -1,56 +1,5 @@
-// Global state store (simple context)
-import React, { createContext, useContext, useState } from 'react'
-
-export const alertasIniciales = [
-  {
-    id: '015',
-    nombre: 'Juan Pérez',
-    edad: 34,
-    ultimaVez: 'Plaza Central, Valparaíso',
-    fecha: '16/05/2026 18:00',
-    descripcion: 'Chamarra negra, jeans azules, mochila roja. Cabello oscuro corto.',
-    zona: 'Valparaíso Centro',
-    lat: -33.046,
-    lng: -71.619,
-    estado: 'activa',
-    avistamientos: 3,
-    voluntarios: 12,
-    foto: null,
-    urgente: true,
-  },
-  {
-    id: '016',
-    nombre: 'María González',
-    edad: 67,
-    ultimaVez: 'Av. Argentina, Valparaíso',
-    fecha: '17/05/2026 09:30',
-    descripcion: 'Vestido floreado rosado, zapatillas blancas. Cabello canoso.',
-    zona: 'Valparaíso Norte',
-    lat: -33.039,
-    lng: -71.625,
-    estado: 'activa',
-    avistamientos: 1,
-    voluntarios: 8,
-    foto: null,
-    urgente: true,
-  },
-  {
-    id: '014',
-    nombre: 'Carlos Fuentes',
-    edad: 16,
-    ultimaVez: 'Cerro Alegre',
-    fecha: '14/05/2026 21:00',
-    descripcion: 'Polera blanca, pantalón negro, audífonos negros.',
-    zona: 'Cerro Alegre',
-    lat: -33.050,
-    lng: -71.613,
-    estado: 'resuelto',
-    avistamientos: 7,
-    voluntarios: 20,
-    foto: null,
-    urgente: false,
-  },
-]
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { supabase } from './supabaseClient'
 
 export const foroInicialData = [
   {
@@ -94,19 +43,71 @@ export const foroInicialData = [
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
-  const [alertas, setAlertas] = useState(alertasIniciales)
+  const [alertas, setAlertas] = useState([])
+  const [cargando, setCargando] = useState(true)
   const [foro, setForo] = useState(foroInicialData)
   const [avistamientos, setAvistamientos] = useState([])
   const [toast, setToast] = useState({ show: false, msg: '' })
+
+  // Cargar alertas desde Supabase al iniciar
+  useEffect(() => {
+    cargarAlertas()
+  }, [])
+
+  const cargarAlertas = async () => {
+    setCargando(true)
+    const { data, error } = await supabase
+      .from('alertas')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error cargando alertas:', error)
+    } else {
+      // Mapear columnas de Supabase al formato del app
+      const mapeadas = data.map(a => ({
+        ...a,
+        ultimaVez: a.ultima_vez,
+      }))
+      setAlertas(mapeadas)
+    }
+    setCargando(false)
+  }
 
   const mostrarToast = (msg) => {
     setToast({ show: true, msg })
     setTimeout(() => setToast({ show: false, msg: '' }), 2800)
   }
 
-  const agregarAlerta = (nueva) => {
-    setAlertas(prev => [nueva, ...prev])
-    mostrarToast('🚨 Alerta creada y notificada a tu zona')
+  const agregarAlerta = async (nueva) => {
+    const { data, error } = await supabase
+      .from('alertas')
+      .insert([{
+        id: nueva.id,
+        nombre: nueva.nombre,
+        edad: nueva.edad,
+        descripcion: nueva.descripcion,
+        ultima_vez: nueva.ultimaVez,
+        fecha: nueva.fecha,
+        zona: nueva.zona,
+        lat: nueva.lat,
+        lng: nueva.lng,
+        estado: nueva.estado,
+        avistamientos: nueva.avistamientos,
+        voluntarios: nueva.voluntarios,
+        urgente: nueva.urgente,
+        foto: nueva.foto,
+      }])
+      .select()
+
+    if (error) {
+      console.error('Error guardando alerta:', error)
+      mostrarToast('❌ Error al guardar la alerta')
+    } else {
+      const guardada = { ...data[0], ultimaVez: data[0].ultima_vez }
+      setAlertas(prev => [guardada, ...prev])
+      mostrarToast('🚨 Alerta creada y notificada a tu zona')
+    }
   }
 
   const agregarAvistamiento = (av) => {
@@ -131,7 +132,7 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      alertas, foro, avistamientos,
+      alertas, cargando, foro, avistamientos,
       agregarAlerta, agregarAvistamiento, agregarForoPost, toggleVoluntario,
       toast, mostrarToast,
     }}>
