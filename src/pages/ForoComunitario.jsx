@@ -2,10 +2,10 @@ import React, { useState } from 'react'
 import { useApp } from '../store'
 
 export default function ForoComunitario() {
-  const { foro, agregarForoPost, alertas } = useApp()
+  const { foro, agregarForoPost, darLikePost, alertas } = useApp()
   const [modalNuevo, setModalNuevo] = useState(false)
   const [form, setForm] = useState({ titulo: '', contenido: '', alertaId: '', tag: 'general' })
-  const [likes, setLikes] = useState({})
+  const [likesLocales, setLikesLocales] = useState({}) // ids que YO di like en esta sesión
   const [filtroTag, setFiltroTag] = useState('todos')
 
   const tags = ['todos', 'avistamiento', 'voluntarios', 'seguridad', 'organización', 'general']
@@ -31,7 +31,10 @@ export default function ForoComunitario() {
   }
 
   const toggleLike = (id) => {
-    setLikes(prev => ({ ...prev, [id]: !prev[id] }))
+    // Si ya di like en esta sesión, no hacer nada (evitar doble like)
+    if (likesLocales[id]) return
+    setLikesLocales(prev => ({ ...prev, [id]: true }))
+    darLikePost(id)
   }
 
   const foroFiltrado = filtroTag === 'todos'
@@ -64,11 +67,11 @@ export default function ForoComunitario() {
             <div className="stat-chip-label">Publicaciones</div>
           </div>
           <div className="stat-chip">
-            <div className="stat-chip-num">{foro.reduce((a, b) => a + b.replies, 0)}</div>
+            <div className="stat-chip-num">{foro.reduce((a, b) => a + (b.replies ?? 0), 0)}</div>
             <div className="stat-chip-label">Respuestas</div>
           </div>
           <div className="stat-chip">
-            <div className="stat-chip-num">{foro.reduce((a, b) => a + b.likes, 0)}</div>
+            <div className="stat-chip-num">{foro.reduce((a, b) => a + (b.likes ?? 0), 0)}</div>
             <div className="stat-chip-label">Apoyos</div>
           </div>
         </div>
@@ -103,8 +106,13 @@ export default function ForoComunitario() {
 
         {/* Posts */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {foroFiltrado.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--gris-texto)', padding: '40px 0', fontSize: '0.9rem' }}>
+              No hay publicaciones en esta categoría aún
+            </div>
+          )}
           {foroFiltrado.map((post, i) => (
-            <div key={post.id} className={`foro-card fade-up`} style={{ animationDelay: `${i * 0.06}s` }}>
+            <div key={post.id} className="foro-card fade-up" style={{ animationDelay: `${i * 0.06}s` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <div style={{
                   width: 38, height: 38,
@@ -132,7 +140,7 @@ export default function ForoComunitario() {
               </p>
 
               {/* Tags */}
-              {post.tags && (
+              {post.tags && post.tags.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                   {post.tags.map(tag => (
                     <span key={tag} className="badge badge-azul">#{tag}</span>
@@ -146,15 +154,17 @@ export default function ForoComunitario() {
                   onClick={() => toggleLike(post.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 5,
-                    background: 'none', fontSize: '0.83rem', color: likes[post.id] ? 'var(--rojo-vivo)' : 'var(--gris-texto)',
-                    fontWeight: likes[post.id] ? 600 : 400,
+                    background: 'none', fontSize: '0.83rem',
+                    color: likesLocales[post.id] ? 'var(--rojo-vivo)' : 'var(--gris-texto)',
+                    fontWeight: likesLocales[post.id] ? 600 : 400,
                     transition: 'all .18s',
+                    cursor: likesLocales[post.id] ? 'default' : 'pointer',
                   }}
                 >
-                  {likes[post.id] ? '❤️' : '🤍'} {post.likes + (likes[post.id] ? 1 : 0)}
+                  {likesLocales[post.id] ? '❤️' : '🤍'} {post.likes ?? 0}
                 </button>
                 <button style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', fontSize: '0.83rem', color: 'var(--gris-texto)' }}>
-                  💬 {post.replies}
+                  💬 {post.replies ?? 0}
                 </button>
                 <button style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', fontSize: '0.83rem', color: 'var(--gris-texto)', marginLeft: 'auto' }}>
                   🔗 Compartir
