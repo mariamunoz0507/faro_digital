@@ -4,7 +4,7 @@ import { useApp } from '../store'
 import ModalNuevaAlerta from '../components/ModalNuevaAlerta'
 
 export default function Dashboard() {
-  const { alertas, toggleVoluntario, mostrarToast } = useApp()
+  const { alertas, toggleVoluntario, marcarResuelto } = useApp()
   const navigate = useNavigate()
   const [modalAlerta, setModalAlerta] = useState(false)
   const [filtro, setFiltro] = useState('activa')
@@ -40,7 +40,7 @@ export default function Dashboard() {
             <div className="stat-chip-label">Alertas activas</div>
           </div>
           <div className="stat-chip">
-            <div className="stat-chip-num">{alertas.reduce((a, b) => a + b.voluntarios, 0)}</div>
+            <div className="stat-chip-num">{alertas.reduce((a, b) => a + (b.voluntarios ?? 0), 0)}</div>
             <div className="stat-chip-label">Voluntarios</div>
           </div>
           <div className="stat-chip">
@@ -121,6 +121,7 @@ export default function Dashboard() {
               onVerMapa={() => navigate('/mapa')}
               onVoluntario={() => toggleVoluntario(alerta.id)}
               onAvistar={() => navigate('/avistamiento')}
+              onResuelto={() => marcarResuelto(alerta.id)}
             />
           ))}
           {filtradas.length === 0 && (
@@ -136,8 +137,23 @@ export default function Dashboard() {
   )
 }
 
-function AlertaCard({ alerta, onVerMapa, onVoluntario, onAvistar }) {
+function AlertaCard({ alerta, onVerMapa, onVoluntario, onAvistar, onResuelto }) {
   const [expandido, setExpandido] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+
+  const handleResuelto = (e) => {
+    e.stopPropagation()
+    if (confirmando) {
+      onResuelto()
+      setConfirmando(false)
+      setExpandido(false)
+    } else {
+      setConfirmando(true)
+      // Auto-cancelar confirmación después de 4 segundos
+      setTimeout(() => setConfirmando(false), 4000)
+    }
+  }
+
   return (
     <div
       className={`alerta-card ${alerta.estado === 'resuelto' ? 'resuelto' : ''}`}
@@ -151,15 +167,16 @@ function AlertaCard({ alerta, onVerMapa, onVoluntario, onAvistar }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '1.5rem',
       }}>
-        👤
+        {alerta.estado === 'resuelto' ? '✅' : '👤'}
       </div>
+
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'var(--font-titulo)', fontWeight: 700, fontSize: '0.97rem' }}>
             {alerta.nombre}
           </span>
           <span className={`badge ${alerta.estado === 'resuelto' ? 'badge-verde' : 'badge-rojo'}`}>
-            {alerta.estado === 'resuelto' ? '✅ Resuelto' : '🔴 Activa'}
+            {alerta.estado === 'resuelto' ? '✅ Encontrado' : '🔴 Activa'}
           </span>
           {alerta.urgente && alerta.estado !== 'resuelto' && (
             <span className="badge badge-amarillo">⚡ Urgente</span>
@@ -180,14 +197,30 @@ function AlertaCard({ alerta, onVerMapa, onVoluntario, onAvistar }) {
             <div style={{ fontSize: '0.85rem', color: 'var(--texto)', marginBottom: 8 }}>
               {alerta.descripcion}
             </div>
+
+            {/* Info resuelto */}
+            {alerta.estado === 'resuelto' && alerta.resuelto_nota && (
+              <div style={{
+                background: '#e8f8ef',
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontSize: '0.82rem',
+                color: '#27ae60',
+                marginBottom: 8,
+              }}>
+                📝 {alerta.resuelto_nota}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--gris-texto)' }}>
-                👁️ {alerta.avistamientos} avistamientos
+                👁️ {alerta.avistamientos ?? 0} avistamientos
               </span>
               <span style={{ fontSize: '0.8rem', color: 'var(--gris-texto)' }}>
-                🤝 {alerta.voluntarios} voluntarios
+                🤝 {alerta.voluntarios ?? 0} voluntarios
               </span>
             </div>
+
             {alerta.estado !== 'resuelto' && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
@@ -210,6 +243,23 @@ function AlertaCard({ alerta, onVerMapa, onVoluntario, onAvistar }) {
                   onClick={(e) => { e.stopPropagation(); onVerMapa(); }}
                 >
                   🗺️ Ver mapa
+                </button>
+
+                {/* Botón marcar como encontrado */}
+                <button
+                  className="btn"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.82rem',
+                    background: confirmando ? '#27ae60' : '#e8f8ef',
+                    color: confirmando ? 'white' : '#27ae60',
+                    border: '1.5px solid #27ae60',
+                    transition: 'all .2s',
+                    fontWeight: confirmando ? 700 : 500,
+                  }}
+                  onClick={handleResuelto}
+                >
+                  {confirmando ? '¿Confirmar? Toca de nuevo ✓' : '✅ Persona encontrada'}
                 </button>
               </div>
             )}
